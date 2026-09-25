@@ -41,6 +41,9 @@ jobs:
           # 502 means the run failed validation/safety gates — surface loudly.
           if [ "$http" != "200" ]; then exit 1; fi
 
+      - name: Checkout (needed for the keepalive commit)
+        uses: actions/checkout@v4
+
       - name: Keepalive commit (keeps schedule from auto-disabling)
         # GitHub disables scheduled workflows after 60 days of no repo activity.
         env:
@@ -53,7 +56,7 @@ jobs:
           git fetch origin main --quiet
           date > .github/keepalive.txt
           git add .github/keepalive.txt
-          if git commit -m "chore: keepalive [skip deploy]"; then
+          if git commit -m "chore: keepalive [skip deploy] [skip ci]"; then
             git push origin HEAD:main --quiet && echo "keepalive pushed"
           else
             echo "nothing to commit"

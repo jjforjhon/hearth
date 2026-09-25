@@ -1,0 +1,30 @@
+name: b2-probe
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SigV4 probe against B2 S3 endpoint
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APP_KEY }}
+          B2_REGION: ${{ secrets.B2_S3_REGION }}
+          B2_BUCKET: ${{ secrets.B2_BUCKET_NAME }}
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: |
+          set -e
+          EP="https://s3.${B2_REGION}.backblazeb2.com"
+          KEY="tmp-gh-probe-${GITHUB_RUN_ID}.bin"
+          echo "== probe from GitHub runner =="
+          echo "github-egress probe payload" > probe.txt
+          echo "PUT:"
+          aws s3api put-object --region "${B2_REGION}" --endpoint-url "${EP}" --bucket "${B2_BUCKET}" --key "${KEY}" --body probe.txt
+          echo "GET:"
+          aws s3api get-object --region "${B2_REGION}" --endpoint-url "${EP}" --bucket "${B2_BUCKET}" --key "${KEY}" out.bin
+          echo "DELETE:"
+          aws s3api delete-object --region "${B2_REGION}" --endpoint-url "${EP}" --bucket "${B2_BUCKET}" --key "${KEY}"
+          echo "== probe OK: put/get/delete all succeeded from GitHub egress =="

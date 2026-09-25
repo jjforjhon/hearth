@@ -1,79 +1,98 @@
 import crypto from "node:crypto";
-import { config } from "../config.js";
 
 /**
- * Backblaze B2 object storage adapter (S3-compatible API, no SDK dependency).
+ * Backblaze B2 storage adapter — S3-compatible API with AWS SigV4 signing.
+ * (The native b2_upload_file pod endpoints returned empty-body 401s from some
+ * networks; the S3 endpoint is a single stable host per region and signs with
+ * the application key directly — no upload-token round-trips.)
  *
  * Free tier: 10 GB storage, free egress, no credit card. Private bucket:
  * downloads happen ONLY through the server's authorized `/api/media/file/:id`
- * route, which fetches from B2 with a short-lived auth token and streams to
- * the user. Direct bucket URLs never work for outsiders.
- *
- * Selected over Render's ephemeral disk (files vanish on every spin-down/
- * redeploy) and over signed-URL-to-bucket designs (would leak private media
- * to anyone holding the URL — breaks the verified IDOR guarantees).
+ * route, which fetches from B2 with SigV4 and streams to the user. Direct
+ * bucket URLs never work for outsiders.
  */
 
-interface B2Auth {
-  token: string;
-  s3ApiUrl: string;
-  apiUrl: string;
-  expiresAt: number;
+const KEY_ID = process.env.B2_KEY_ID ?? "";
+const APP_KEY = process.env.B2_APP_KEY ?? "";
+const BUCKET = process.env.B2_BUCKET_NAME ?? "";
+const REGION = process.env.B2_S3_REGION ?? "";
+
+function host(): string {
+  return `s3.${REGION}.backblazeb2.com`;
 }
 
-let cachedAuth: B2Auth | null = null;
+function sha256Hex(data: crypto.BinaryLike): string {
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
 
-async function b2Auth(): Promise<B2Auth> {
-  if (cachedAuth && cachedAuth.expiresAt > Date.now() + 60_000) return cachedAuth;
-  const res = await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account", {
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${config.b2.keyId}:${config.b2.appKey}`).toString("base64")}`,
-    },
-  });
-  if (!res.ok) throw new Error(`B2 auth failed (${res.status})`);
-  const data = (await res.json()) as {
-    authorizationToken: string;
-    apiUrl: string;
-    s3ApiUrl: string;
+function hmac(key: crypto.BinaryLike | Buffer, data: string): Buffer {
+  return crypto.createHmac("sha256", key).update(data).digest();
+}
+
+interface SigV4Headers {
+  Authorization: string;
+  "x-amz-date": string;
+  "x-amz-content-sha256": string;
+  "x-amz-content-type"?: string;
+}
+
+function sigv4Headers(method: string, objectKey: string, payloadHash: string): SigV4Headers {
+  const amzDate = new Date()
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z")
+    .replace(/[:-]/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const h = host();
+  const canonicalUri = `/${BUCKET}/${objectKey
+    .split("/")
+    .map((seg) => encodeURIComponent(seg))
+    .join("/")}`;
+  const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+  const canonicalHeaders = `host:${h}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const scope = `${dateStamp}/${REGION}/s3/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    scope,
+    sha256Hex(canonicalRequest),
+  ].join("\n");
+  const kDate = hmac(`AWS4${APP_KEY}`, dateStamp);
+  const kRegion = hmac(kDate, REGION);
+  const kService = hmac(kRegion, "s3");
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = crypto.createHmac("sha256", kSigning).update(stringToSign).digest("hex");
+  return {
+    Authorization: `AWS4-HMAC-SHA256 Credential=${KEY_ID}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    "x-amz-date": amzDate,
+    "x-amz-content-sha256": payloadHash,
   };
-  cachedAuth = {
-    token: data.authorizationToken,
-    apiUrl: data.apiUrl,
-    s3ApiUrl: data.s3ApiUrl,
-    expiresAt: Date.now() + 23 * 60 * 60 * 1000, // tokens last 24h
-  };
-  return cachedAuth;
 }
 
 function objectKey(storagePath: string): string {
-  // storage_path stored in DB is the object key for B2 mode (e.g. "media/med_x.png")
+  // storage_path stored in DB is the object key in B2 mode (e.g. "media/med_x.png")
   return storagePath.replace(/^\/+/, "");
 }
 
 export async function b2Put(storagePath: string, buf: Buffer, mime: string): Promise<void> {
-  const auth = await b2Auth();
-  const urlRes = await fetch(
-    `${auth.apiUrl}/b2api/v3/b2_get_upload_url?bucketId=${encodeURIComponent(config.b2.bucketId)}`,
-    { headers: { Authorization: auth.token } },
-  );
-  if (!urlRes.ok) throw new Error(`B2 get_upload_url failed (${urlRes.status})`);
-  const { uploadUrl, authorizationToken } = (await urlRes.json()) as {
-    uploadUrl: string;
-    authorizationToken: string;
-  };
-  const sha1 = crypto.createHash("sha1").update(buf).digest("hex");
-  const up = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: authorizationToken,
-      "X-Bz-File-Name": encodeURIComponent(objectKey(storagePath)),
-      "Content-Type": mime,
-      "Content-Length": String(buf.length),
-      "X-Bz-Content-Sha1": sha1,
-    },
+  const payloadHash = sha256Hex(buf);
+  const headers = sigv4Headers("PUT", objectKey(storagePath), payloadHash);
+  const res = await fetch(`https://${host()}/${BUCKET}/${objectKey(storagePath)}`, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": mime, "Content-Length": String(buf.length) },
     body: new Uint8Array(buf),
   });
-  if (!up.ok) throw new Error(`B2 upload failed (${up.status})`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`B2 S3 put failed (${res.status}): ${detail.slice(0, 200)}`);
+  }
 }
 
 /**
@@ -82,42 +101,33 @@ export async function b2Put(storagePath: string, buf: Buffer, mime: string): Pro
  * room-membership/owner checks in routes/media.ts always apply.
  */
 export async function b2Get(storagePath: string): Promise<Buffer | null> {
-  const auth = await b2Auth();
-  const url = `${auth.apiUrl}/b2api/v3/b2_download_file_by_name?bucketId=${encodeURIComponent(
-    config.b2.bucketId,
-  )}&fileName=${encodeURIComponent(objectKey(storagePath))}`;
-  const res = await fetch(url, { headers: { Authorization: auth.token } });
+  const emptyHash = sha256Hex("");
+  const headers = sigv4Headers("GET", objectKey(storagePath), emptyHash);
+  const res = await fetch(`https://${host()}/${BUCKET}/${objectKey(storagePath)}`, {
+    method: "GET",
+    headers,
+  });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`B2 download failed (${res.status})`);
+  if (!res.ok) throw new Error(`B2 S3 get failed (${res.status})`);
   return Buffer.from(await res.arrayBuffer());
 }
 
 export async function b2Delete(storagePath: string): Promise<void> {
-  const auth = await b2Auth();
-  // Look up fileId by name first (delete requires the fileId).
-  const list = await fetch(`${auth.apiUrl}/b2api/v3/b2_list_file_names`, {
-    method: "POST",
-    headers: { Authorization: auth.token, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bucketId: config.b2.bucketId,
-      startFileName: objectKey(storagePath),
-      maxFileCount: 1,
-    }),
+  const emptyHash = sha256Hex("");
+  const headers = sigv4Headers("DELETE", objectKey(storagePath), emptyHash);
+  const res = await fetch(`https://${host()}/${BUCKET}/${objectKey(storagePath)}`, {
+    method: "DELETE",
+    headers,
   });
-  if (!list.ok) throw new Error(`B2 list failed (${list.status})`);
-  const { files } = (await list.json()) as { files: Array<{ fileName: string; fileId: string }> };
-  const match = files.find((f) => f.fileName === objectKey(storagePath));
-  if (!match) return; // already gone
-  await fetch(`${auth.apiUrl}/b2api/v3/b2_delete_file_version`, {
-    method: "POST",
-    headers: { Authorization: auth.token, "Content-Type": "application/json" },
-    body: JSON.stringify({ fileName: match.fileName, fileId: match.fileId }),
-  });
+  // 204 = deleted; 404 = already gone; anything else is an error.
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`B2 S3 delete failed (${res.status})`);
+  }
 }
 
 /**
  * Object key used as the DB `storage_path` value in B2 mode.
- * Content-addressable style, flat namespace, extension preserved.
+ * Flat namespace under media/, extension preserved.
  */
 export function b2KeyFor(id: string, ext: string): string {
   return `media/${id}.${ext}`;

@@ -1,0 +1,13 @@
+node_modules
+data
+data-*
+dist
+build
+*.log
+logs
+.git
+.freebuff
+tmp
+.env
+.env.local
+.env.*.local

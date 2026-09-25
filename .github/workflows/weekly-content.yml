@@ -1,0 +1,60 @@
+name: Weekly content pipeline
+
+on:
+  schedule:
+    # Sundays 03:00 UTC (GitHub cron is UTC only). Idempotent: a repeated
+    # trigger within the same week returns "already published" and changes nothing.
+    - cron: "0 3 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-content
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger production pipeline
+        env:
+          URL: ${{ secrets.PROD_URL }}
+          SECRET: ${{ secrets.HEARTH_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          # Wake the free-tier service first (cold start can take ~60s).
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "$URL/api/health" || true)
+          echo "health probe: $code"
+          for i in 1 2 3 4 5; do
+            [ "$code" = "200" ] && break
+            sleep 20
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "$URL/api/health" || true)
+          done
+          [ "$code" = "200" ] || { echo "service did not wake"; exit 1; }
+          http=$(curl -s -o /tmp/out.json -w "%{http_code}" --max-time 600 \
+            -X POST "$URL/api/admin/cron/weekly" \
+            -H "Authorization: Bearer $SECRET" \
+            -H "Content-Type: application/json" -d '{}')
+          echo "pipeline response ($http):"; cat /tmp/out.json; echo
+          # 502 means the run failed validation/safety gates — surface loudly.
+          if [ "$http" != "200" ]; then exit 1; fi
+
+      - name: Keepalive commit (keeps schedule from auto-disabling)
+        # GitHub disables scheduled workflows after 60 days of no repo activity.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "hearth-keepalive"
+          git config user.email "actions@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git
+          git fetch origin main --quiet
+          date > .github/keepalive.txt
+          git add .github/keepalive.txt
+          if git commit -m "chore: keepalive [skip deploy]"; then
+            git push origin HEAD:main --quiet && echo "keepalive pushed"
+          else
+            echo "nothing to commit"
+          fi

@@ -1,0 +1,48 @@
+# Render Blueprint — Hearth production (free tier).
+# Deploy: Render Dashboard → New → Blueprint → point at this repo.
+# Free-tier facts (verified 2026-09): 750 instance hours/mo, 15-min idle spin-down
+# (~1 min cold start), ephemeral filesystem (hence LIBSQL_URL + B2 below).
+# Render Postgres is NOT used — free databases expire after 30 days.
+
+services:
+  - type: web
+    name: hearth
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build:web
+    startCommand: npm run start -w @hearth/server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # In-process cron is unreliable on spin-down hosts; GitHub Actions
+      # calls POST /api/admin/cron/weekly instead (see .github/workflows).
+      - key: HEARTH_DISABLE_CRON
+        value: "1"
+      # Cloud database (Turso/libSQL) — required: filesystem is ephemeral.
+      - key: LIBSQL_URL
+        sync: false
+      - key: LIBSQL_AUTH_TOKEN
+        sync: false
+      # Private media storage (Backblaze B2) — required for persistent uploads.
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APP_KEY
+        sync: false
+      - key: B2_BUCKET_ID
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
+      - key: B2_S3_REGION
+        sync: false
+      # Auto-generated strong secrets (viewable in the Render dashboard).
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MEDIA_SIGNING_SECRET
+        generateValue: true
+      - key: HEARTH_CRON_SECRET
+        generateValue: true
+      # PUBLIC_ORIGIN is auto-derived from RENDER_EXTERNAL_URL at runtime.

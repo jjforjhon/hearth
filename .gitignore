@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Data (SQLite database, uploaded media, smoke-test DBs)
+data/
+data-*/
+*.db
+*.db-shm
+*.db-wal
+
+# Builds
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local agent workspace
+.freebuff/
+
+# Test artifacts
+/tmp/

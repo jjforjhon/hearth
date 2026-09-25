@@ -43,10 +43,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     displayName: zDisplayName,
   });
 
+  // RATE_LIMIT_*_MAX overrides exist for the test runner (all suite clients
+  // share one loopback IP); production defaults are the values below.
   const RL = {
-    login: { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } },
-    register: { config: { rateLimit: { max: 12, timeWindow: "1 minute" } } },
-    reset: { config: { rateLimit: { max: 3, timeWindow: "1 minute" } } },
+    login: { config: { rateLimit: { max: Number(process.env.RATE_LIMIT_LOGIN_MAX ?? 8), timeWindow: "1 minute" } } },
+    register: { config: { rateLimit: { max: Number(process.env.RATE_LIMIT_REGISTER_MAX ?? 12), timeWindow: "1 minute" } } },
+    reset: { config: { rateLimit: { max: Number(process.env.RATE_LIMIT_RESET_MAX ?? 3), timeWindow: "1 minute" } } },
   } as const;
 
   app.post("/register", RL.register, async (req, reply) => {

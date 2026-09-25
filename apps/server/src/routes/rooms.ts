@@ -249,7 +249,8 @@ export async function roomRoutes(app: FastifyInstance): Promise<void> {
 
   app.post(
     "/:id/messages",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    // RATE_LIMIT_CHAT_MAX exists for the test runner; production default stays 30.
+    { config: { rateLimit: { max: Number(process.env.RATE_LIMIT_CHAT_MAX ?? 30), timeWindow: "1 minute" } } },
     async (req, reply) => {
     const me = req.currentUser;
     if (!me) return reply.code(401).send({ error: "Not signed in" });

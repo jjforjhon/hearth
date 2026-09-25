@@ -50,7 +50,9 @@ app.addHook("onSend", async (_req, reply) => {
 await app.register(cookie);
 await app.register(rateLimit, {
   global: true,
-  max: 300,
+  // RATE_LIMIT_MAX exists for the test runner (hundreds of loopback requests
+  // per minute from one IP); production default stays 300.
+  max: Number(process.env.RATE_LIMIT_MAX ?? 300),
   timeWindow: "1 minute",
   // Stricter per-route limits are declared on sensitive routes.
 });

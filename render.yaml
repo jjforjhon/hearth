@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run build:web
+    buildCommand: npm ci --include=dev && npm run build:web
     startCommand: npm run start -w @hearth/server
     healthCheckPath: /api/health
     envVars:

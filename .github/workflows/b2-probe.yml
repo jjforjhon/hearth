@@ -18,7 +18,8 @@ jobs:
         run: |
           set -e
           EP="https://s3.${B2_REGION}.backblazeb2.com"
-          KEY="tmp-gh-probe-${GITHUB_RUN_ID}.bin"
+          KEY="hearth/tmp-gh-probe-${GITHUB_RUN_ID}.bin"
+          echo "== probe from GitHub runner (key must start with 'hearth': app key namePrefix) =="
           echo "== probe from GitHub runner =="
           echo "github-egress probe payload" > probe.txt
           echo "PUT:"

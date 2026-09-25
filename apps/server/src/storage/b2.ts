@@ -29,12 +29,7 @@ function hmac(key: crypto.BinaryLike | Buffer, data: string): Buffer {
   return crypto.createHmac("sha256", key).update(data).digest();
 }
 
-interface SigV4Headers {
-  Authorization: string;
-  "x-amz-date": string;
-  "x-amz-content-sha256": string;
-  "x-amz-content-type"?: string;
-}
+type SigV4Headers = Record<string, string>;
 
 function sigv4Headers(method: string, objectKey: string, payloadHash: string): SigV4Headers {
   const amzDate = new Date()
@@ -127,8 +122,10 @@ export async function b2Delete(storagePath: string): Promise<void> {
 
 /**
  * Object key used as the DB `storage_path` value in B2 mode.
- * Flat namespace under media/, extension preserved.
+ * MUST start with "hearth" — the app key is created with namePrefix "hearth",
+ * and B2 rejects any request for keys outside that prefix with 403 not entitled
+ * (checked BEFORE signature validation, which made it look like an auth bug).
  */
 export function b2KeyFor(id: string, ext: string): string {
-  return `media/${id}.${ext}`;
+  return `hearth/media/${id}.${ext}`;
 }

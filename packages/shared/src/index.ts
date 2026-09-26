@@ -56,6 +56,8 @@ export const GAME_IDS = [
   "story_together",
   "would_you_rather",
   "guess_the_player",
+  "uno",
+  "ludo",
 ] as const;
 
 export type GameId = (typeof GAME_IDS)[number];

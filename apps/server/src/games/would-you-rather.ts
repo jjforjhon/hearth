@@ -38,7 +38,7 @@ export const wouldYouRatherGame: GameModule<WouldYouRatherState> = {
   tagline: "Impossible choices, loud debates",
   description:
     "Dilemmas with no right answer. Everyone locks in a choice, then the reveal — and the arguing — begins. Lone wolves earn bonus points for bravery.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 10,
   approxMinutes: 12,
   style: "conversation",

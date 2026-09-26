@@ -10,6 +10,8 @@ import { wordAssociationGame } from "./word-association.js";
 import { storyTogetherGame } from "./story-together.js";
 import { wouldYouRatherGame } from "./would-you-rather.js";
 import { guessThePlayerGame } from "./guess-the-player.js";
+import { unoGame } from "./uno.js";
+import { ludoGame } from "./ludo.js";
 
 /**
  * The game plugin table. Adding a game = implementing GameModule and adding
@@ -26,6 +28,8 @@ const registry = new Map<GameId, GameModule<BaseGameState>>([
   [storyTogetherGame.id, storyTogetherGame as unknown as GameModule<BaseGameState>],
   [wouldYouRatherGame.id, wouldYouRatherGame as unknown as GameModule<BaseGameState>],
   [guessThePlayerGame.id, guessThePlayerGame as unknown as GameModule<BaseGameState>],
+  [unoGame.id, unoGame as unknown as GameModule<BaseGameState>],
+  [ludoGame.id, ludoGame as unknown as GameModule<BaseGameState>],
 ]);
 
 export function getGame(id: GameId): GameModule<BaseGameState> | undefined {

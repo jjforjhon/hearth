@@ -61,7 +61,7 @@ export const truthOrDareGame: GameModule<TruthOrDareState> = {
   tagline: "The classic, with weekly-fresh prompts",
   description:
     "Spin to pick who's up, choose Truth or Dare, and let the server draw from a weekly-refreshed library. Dares can invite photos, voice notes or drawings — always shared privately to the room.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 10,
   approxMinutes: 20,
   style: "conversation",
@@ -213,7 +213,7 @@ export const truthOrDareGame: GameModule<TruthOrDareState> = {
         if (s.turnIndex === 0) s.round += 1;
       }
     }
-    if (s.order.length < 3) {
+    if (s.order.length < 2) {
       s.status = "completed";
       return { state: s, completed: true };
     }

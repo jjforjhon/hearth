@@ -115,7 +115,7 @@ plugs into. A new game = one server module + one registry entry + one client com
 no platform code changes. See `docs/ADDING-A-GAME.md`.
 
 Games shipped: truth_false, truth_or_dare, draw_together, coop_puzzle, this_or_that,
-know_me, word_association, story_together, would_you_rather, guess_the_player.
+know_me, word_association, story_together, would_you_rather, guess_the_player, uno, ludo.
 
 ---
 

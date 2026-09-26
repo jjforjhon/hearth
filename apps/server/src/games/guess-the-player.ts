@@ -40,7 +40,7 @@ export const guessThePlayerGame: GameModule<GuessThePlayerState> = {
   tagline: "Who said that?",
   description:
     "Everyone answers the same prompt in secret. The answers come back shuffled — can you tell who wrote what? Reading the room has never been more competitive.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 10,
   approxMinutes: 12,
   style: "conversation",

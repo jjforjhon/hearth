@@ -26,9 +26,9 @@ The server also serves the production build at :4318 after `npm run build:web`.
 | `apps/web` | React + Vite client with a hand-rolled design system |
 | `packages/shared` | Protocol contract shared by both sides (types + zod schemas) |
 
-Ten games ship out of the box: True or False, Truth or Dare, Draw Together, Co-op
+Twelve games ship out of the box: True or False, Truth or Dare, Draw Together, Co-op
 Puzzle, This or That, How Well Do You Know Me?, Word Association, Story Together,
-Would You Rather, Guess the Player.
+Would You Rather, Guess the Player, UNO, Ludo.
 
 ## Documentation
 

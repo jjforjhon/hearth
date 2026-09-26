@@ -9,6 +9,8 @@ import { KnowMe } from "../games/KnowMe";
 import { WordAssociation } from "../games/WordAssociation";
 import { StoryTogether } from "../games/StoryTogether";
 import { GuessThePlayer } from "../games/GuessThePlayer";
+import { Uno } from "../games/Uno";
+import { Ludo } from "../games/Ludo";
 
 /** Routes the active game to its UI. Adding a game = one import + one case. */
 export function GameStage(): ReactNode {
@@ -51,6 +53,10 @@ export function GameStage(): ReactNode {
       return <WouldYouRather state={gameState} />;
     case "guess_the_player":
       return <GuessThePlayer state={gameState} />;
+    case "uno":
+      return <Uno state={gameState} />;
+    case "ludo":
+      return <Ludo state={gameState} />;
     default:
       return (
         <div className="game-panel">

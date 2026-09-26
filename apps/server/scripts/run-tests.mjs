@@ -16,7 +16,7 @@ import path from "node:path";
 
 const ROOT = process.cwd(); // apps/server
 const PORT = 4318;
-const SUITES = ["security", "e2e-flow", "realtime", "content-pipeline"];
+const SUITES = ["security", "e2e-flow", "realtime", "board-card", "content-pipeline"];
 
 const req = createRequire(path.join(ROOT, "package.json"));
 const tsxCli = path.join(path.dirname(req.resolve("tsx/package.json")), "dist", "cli.mjs");

@@ -20,6 +20,8 @@ const STYLE_LABEL: Record<string, string> = {
   creative: "Creative",
   cooperative: "Co-op",
   quiz: "Quick-fire",
+  cards: "Card game",
+  board: "Board game",
 };
 
 export function Games(): ReactNode {

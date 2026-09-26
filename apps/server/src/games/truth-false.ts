@@ -51,7 +51,7 @@ export const truthFalseGame: GameModule<TruthFalseState> = {
   tagline: "Guess the facts about each other",
   description:
     "Each round one player answers a personal statement with true or false — everyone else bets on what they'll say. Matches score points and spark the best arguments.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 10,
   approxMinutes: 10,
   style: "conversation",

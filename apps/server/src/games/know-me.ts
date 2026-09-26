@@ -43,7 +43,7 @@ export const knowMeGame: GameModule<KnowMeState> = {
   tagline: "Predict each other's answers",
   description:
     "One player answers a question in secret. Everyone else guesses what they said. The reveal is where friendships are tested — kindly.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 10,
   approxMinutes: 12,
   style: "conversation",
